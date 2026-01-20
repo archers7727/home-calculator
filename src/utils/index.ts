@@ -1,1 +1,1 @@
-export { generateFirstBuyPDF } from './pdfGenerator';
+export { generateFirstBuyPDF, generateTradeUpPDF } from './pdfGenerator';

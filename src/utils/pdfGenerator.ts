@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf';
-import { HousingInfo, BuyerInfo, CostCalculation, LoanResult } from '../types';
+import { HousingInfo, BuyerInfo, CostCalculation, LoanResult, PropertyForSale, SaleCalculation } from '../types';
 import { formatPriceWon, formatPercent, formatArea } from '../constants';
 
 interface FirstBuyPDFData {
@@ -164,5 +164,175 @@ export function generateFirstBuyPDF(data: FirstBuyPDFData) {
 
   // Save
   const fileName = `home-purchase-simulation-${new Date().toISOString().split('T')[0]}.pdf`;
+  doc.save(fileName);
+}
+
+// Trade-up PDF
+interface TradeUpPDFData {
+  currentProperty: PropertyForSale;
+  saleResult: SaleCalculation;
+  newProperty: HousingInfo;
+  purchaseCost: CostCalculation;
+  loans: LoanResult[];
+  recommendation: {
+    loans: LoanResult[];
+    totalAmount: number;
+    monthlyPayment: number;
+  };
+  additionalFundsNeeded: number;
+  requiredCapital: number;
+}
+
+export function generateTradeUpPDF(data: TradeUpPDFData) {
+  const {
+    currentProperty,
+    saleResult,
+    newProperty,
+    purchaseCost,
+    recommendation,
+    additionalFundsNeeded,
+    requiredCapital,
+  } = data;
+
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  let y = 20;
+
+  // Helper functions
+  const addTitle = (text: string) => {
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text(text, pageWidth / 2, y, { align: 'center' });
+    y += 12;
+  };
+
+  const addSectionTitle = (text: string) => {
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(37, 99, 235);
+    doc.text(text, 20, y);
+    doc.setTextColor(0, 0, 0);
+    y += 8;
+  };
+
+  const addRow = (label: string, value: string, isTotal = false) => {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', isTotal ? 'bold' : 'normal');
+    doc.text(label, 25, y);
+    doc.text(value, pageWidth - 25, y, { align: 'right' });
+    y += 6;
+  };
+
+  const addLine = () => {
+    doc.setDrawColor(200, 200, 200);
+    doc.line(20, y, pageWidth - 20, y);
+    y += 5;
+  };
+
+  const addSpace = (space = 8) => {
+    y += space;
+  };
+
+  // Title
+  addTitle('Trade-Up Simulation Report');
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Generated: ${new Date().toLocaleDateString('ko-KR')}`, pageWidth / 2, y, {
+    align: 'center',
+  });
+  y += 15;
+
+  // Summary Box
+  doc.setFillColor(37, 99, 235);
+  doc.roundedRect(20, y, pageWidth - 40, 25, 3, 3, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(12);
+  doc.text('Additional Funds Needed', pageWidth / 2, y + 8, { align: 'center' });
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text(formatPriceWon(additionalFundsNeeded), pageWidth / 2, y + 18, { align: 'center' });
+  doc.setTextColor(0, 0, 0);
+  y += 35;
+
+  // Current Property Sale
+  addSectionTitle('Current Property (Sale)');
+  addLine();
+  addRow('Sale Price', formatPriceWon(currentProperty.currentValue));
+  addRow('Purchase Price', formatPriceWon(currentProperty.purchasePrice));
+  addRow('Capital Gain', formatPriceWon(saleResult.capitalGain));
+  addSpace(2);
+  addRow(
+    'Capital Gains Tax',
+    saleResult.isTaxExempt ? '0 (Tax Exempt)' : formatPriceWon(saleResult.capitalGainsTax)
+  );
+  addRow('Brokerage Fee', formatPriceWon(saleResult.brokerageFee.total));
+  addLine();
+  addRow('Net Proceeds', formatPriceWon(saleResult.netProceeds), true);
+  addSpace();
+
+  // Tax Exemption Status
+  if (saleResult.isTaxExempt) {
+    doc.setFontSize(9);
+    doc.setTextColor(16, 185, 129); // Green
+    doc.text('* 1-house tax exemption applied', 25, y);
+    doc.setTextColor(0, 0, 0);
+    y += 8;
+  }
+
+  // New Property Purchase
+  addSectionTitle('New Property (Purchase)');
+  addLine();
+  addRow('Purchase Price', formatPriceWon(newProperty.price));
+  addRow('Area', formatArea(newProperty.area));
+  addRow('Location', `${newProperty.region} ${newProperty.district}`);
+  addSpace(2);
+  addRow(`Acquisition Tax (${formatPercent(purchaseCost.acquisitionTax.baseRate)})`, formatPriceWon(purchaseCost.acquisitionTax.total));
+  addRow('Brokerage Fee', formatPriceWon(purchaseCost.brokerageFee.total));
+  addRow('Legal & Other Fees', formatPriceWon(purchaseCost.lawyerFee + purchaseCost.housingBond + purchaseCost.stampDuty));
+  addLine();
+  addRow('Total Cost', formatPriceWon(purchaseCost.total), true);
+  addSpace();
+
+  // Funding Plan
+  addSectionTitle('Funding Plan');
+  addLine();
+  addRow('New Property Total Cost', formatPriceWon(purchaseCost.total));
+  addRow('Net Proceeds from Sale', `-${formatPriceWon(saleResult.netProceeds)}`);
+  addRow('Additional Funds Needed', formatPriceWon(additionalFundsNeeded), true);
+  addSpace(2);
+  addRow('Loan Available', formatPriceWon(recommendation.totalAmount));
+  addRow('Required Capital', formatPriceWon(requiredCapital), true);
+  addSpace();
+
+  if (recommendation.monthlyPayment > 0) {
+    addRow('Est. Monthly Payment', `~${formatPriceWon(recommendation.monthlyPayment)}`);
+    doc.setFontSize(8);
+    doc.text('(Based on 30-year amortization)', 25, y);
+    y += 8;
+  }
+
+  // Loan Details
+  if (recommendation.loans.length > 0) {
+    addSpace();
+    addSectionTitle('Recommended Loans');
+    recommendation.loans.forEach((loan) => {
+      addRow(`${loan.name}`, `${formatPriceWon(loan.limit)} @ ${formatPercent(loan.rate)}`);
+    });
+  }
+
+  // Footer
+  y = doc.internal.pageSize.getHeight() - 25;
+  doc.setFontSize(8);
+  doc.setTextColor(128, 128, 128);
+  doc.text('Important Notes:', 20, y);
+  y += 4;
+  doc.text('- Temporary 2-house: Must sell existing property within 3 years', 20, y);
+  y += 4;
+  doc.text('- This report is for reference only. Actual taxes may vary.', 20, y);
+  y += 4;
+  doc.text('- Please consult with tax professionals for accurate information.', 20, y);
+
+  // Save
+  const fileName = `trade-up-simulation-${new Date().toISOString().split('T')[0]}.pdf`;
   doc.save(fileName);
 }
