@@ -1,0 +1,1 @@
+export { generateFirstBuyPDF } from './pdfGenerator';
