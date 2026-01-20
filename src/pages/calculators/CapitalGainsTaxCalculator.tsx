@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { Save, Check } from 'lucide-react';
 import {
   Card,
   CardContent,
+  Button,
   PriceInput,
   Input,
   Checkbox,
@@ -13,6 +15,7 @@ import {
 import { calculateSaleResult } from '../../calculators';
 import { PropertyForSale, SaleCalculation } from '../../types';
 import { formatPercent, formatPriceWon } from '../../constants';
+import { useHistoryStore } from '../../store';
 
 export function CapitalGainsTaxCalculator() {
   const [purchasePrice, setPurchasePrice] = useState(400_000_000);
@@ -23,6 +26,8 @@ export function CapitalGainsTaxCalculator() {
   const [residenceMonths, setResidenceMonths] = useState(10);
   const [isSingleHousehold, setIsSingleHousehold] = useState(true);
   const [result, setResult] = useState<SaleCalculation | null>(null);
+  const [saved, setSaved] = useState(false);
+  const { addItem } = useHistoryStore();
 
   useEffect(() => {
     const property: PropertyForSale = {
@@ -39,9 +44,25 @@ export function CapitalGainsTaxCalculator() {
 
     const calcResult = calculateSaleResult(property);
     setResult(calcResult);
+    setSaved(false);
   }, [purchasePrice, salePrice, purchaseYear, purchaseMonth, residenceYears, residenceMonths, isSingleHousehold]);
 
   const capitalGain = salePrice - purchasePrice;
+
+  const handleSave = () => {
+    if (!result) return;
+    addItem({
+      type: 'capital-gains-tax',
+      data: {
+        salePrice,
+        purchasePrice,
+        capitalGain,
+        tax: result.capitalGainsTax,
+        isTaxExempt: result.isTaxExempt,
+      },
+    });
+    setSaved(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -238,6 +259,25 @@ export function CapitalGainsTaxCalculator() {
                 </ResultSection>
               </CardContent>
             </Card>
+
+            <Button
+              onClick={handleSave}
+              disabled={saved}
+              className="w-full"
+              variant={saved ? 'secondary' : 'primary'}
+            >
+              {saved ? (
+                <>
+                  <Check className="w-4 h-4 mr-2" />
+                  저장됨
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  계산 결과 저장
+                </>
+              )}
+            </Button>
           </div>
         )}
       </div>

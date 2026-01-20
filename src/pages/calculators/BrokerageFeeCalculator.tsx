@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { Save, Check } from 'lucide-react';
 import {
   Card,
   CardContent,
+  Button,
   PriceInput,
   ResultSection,
   ResultRow,
@@ -10,15 +12,32 @@ import {
 import { calculateBrokerageFee } from '../../calculators';
 import { BrokerageFeeResult } from '../../types';
 import { formatPercent, formatPriceWon, BROKERAGE_FEE_RATES } from '../../constants';
+import { useHistoryStore } from '../../store';
 
 export function BrokerageFeeCalculator() {
   const [price, setPrice] = useState(800_000_000);
   const [result, setResult] = useState<BrokerageFeeResult | null>(null);
+  const [saved, setSaved] = useState(false);
+  const { addItem } = useHistoryStore();
 
   useEffect(() => {
     const calcResult = calculateBrokerageFee(price);
     setResult(calcResult);
+    setSaved(false);
   }, [price]);
+
+  const handleSave = () => {
+    if (!result) return;
+    addItem({
+      type: 'brokerage-fee',
+      data: {
+        transactionPrice: price,
+        fee: result.total,
+        rate: result.rate,
+      },
+    });
+    setSaved(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -120,6 +139,25 @@ export function BrokerageFeeCalculator() {
                 </ul>
               </CardContent>
             </Card>
+
+            <Button
+              onClick={handleSave}
+              disabled={saved}
+              className="w-full"
+              variant={saved ? 'secondary' : 'primary'}
+            >
+              {saved ? (
+                <>
+                  <Check className="w-4 h-4 mr-2" />
+                  저장됨
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  계산 결과 저장
+                </>
+              )}
+            </Button>
           </div>
         )}
       </div>

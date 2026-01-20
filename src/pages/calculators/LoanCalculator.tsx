@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
+  Button,
   PriceInput,
   Checkbox,
   RadioGroup,
@@ -11,7 +12,8 @@ import {
 import { calculateAllLoans, calculateMonthlyPayment } from '../../calculators';
 import { HousingInfo, BuyerInfo, LoanResult } from '../../types';
 import { formatPercent, formatPriceWon } from '../../constants';
-import { Check, X } from 'lucide-react';
+import { Check, X, Save } from 'lucide-react';
+import { useHistoryStore } from '../../store';
 
 export function LoanCalculator() {
   const [price, setPrice] = useState(800_000_000);
@@ -21,6 +23,8 @@ export function LoanCalculator() {
   const [hasBabyPlan, setHasBabyPlan] = useState(false);
   const [childCount, setChildCount] = useState(0);
   const [results, setResults] = useState<LoanResult[]>([]);
+  const [saved, setSaved] = useState(false);
+  const { addItem } = useHistoryStore();
 
   const totalIncome = income + spouseIncome;
 
@@ -46,7 +50,25 @@ export function LoanCalculator() {
 
     const loans = calculateAllLoans(housing, buyer);
     setResults(loans);
+    setSaved(false);
   }, [price, income, spouseIncome, isNewlywed, hasBabyPlan, childCount]);
+
+  const handleSave = () => {
+    const eligibleLoans = results.filter((l) => l.eligible);
+    const totalLoanAmount = eligibleLoans.reduce((sum, l) => sum + l.limit, 0);
+    const totalMonthlyPayment = eligibleLoans.reduce((sum, l) => sum + l.monthlyPayment, 0);
+
+    addItem({
+      type: 'loan',
+      data: {
+        propertyPrice: price,
+        eligibleLoans: eligibleLoans.map((l) => l.name),
+        totalLoanAmount,
+        monthlyPayment: totalMonthlyPayment,
+      },
+    });
+    setSaved(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -149,6 +171,25 @@ export function LoanCalculator() {
               </ul>
             </CardContent>
           </Card>
+
+          <Button
+            onClick={handleSave}
+            disabled={saved}
+            className="w-full"
+            variant={saved ? 'secondary' : 'primary'}
+          >
+            {saved ? (
+              <>
+                <Check className="w-4 h-4 mr-2" />
+                저장됨
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                계산 결과 저장
+              </>
+            )}
+          </Button>
         </div>
       </div>
     </div>
